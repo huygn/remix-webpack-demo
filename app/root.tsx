@@ -1,6 +1,7 @@
 import { json, LoaderArgs, redirect } from "@remix-run/node";
 import {
   Form,
+  Link,
   Links,
   LiveReload,
   NavLink,
@@ -10,9 +11,8 @@ import {
   useSubmit,
   useTransition as useNavigation,
 } from "@remix-run/react";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 
-import { createContact, getContacts } from "~/lib/contact";
 import ErrorPage from "~/lib/error-page";
 import styles from "~/index.css";
 
@@ -23,13 +23,11 @@ export function links() {
 export async function loader({ request }: LoaderArgs) {
   const url = new URL(request.url);
   const q = url.searchParams.get("q")!;
-  const contacts = await getContacts(q);
-  return json({ contacts, q });
+  return json({ contacts: [], q });
 }
 
 export async function action() {
-  const contact = await createContact();
-  return redirect(`/contacts/${contact.id}/edit`);
+  return redirect(`/about`);
 }
 
 export default function Root() {
@@ -60,7 +58,9 @@ export default function Root() {
       <body>
         <div id="root">
           <div id="sidebar">
-            <h1>React Router Contacts</h1>
+            <h1>
+              <Link to="/">Remix Webpack Example</Link>
+            </h1>
             <div>
               <Form id="search-form" role="search">
                 <input
@@ -127,7 +127,9 @@ export default function Root() {
             id="detail"
             className={navigation.state === "loading" ? "loading" : ""}
           >
-            <Outlet />
+            <Suspense>
+              <Outlet />
+            </Suspense>
           </div>
         </div>
         <Scripts />

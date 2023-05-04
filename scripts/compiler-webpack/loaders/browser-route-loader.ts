@@ -22,16 +22,92 @@ async function treeshakeBrowserExports(
   const browserExports = xports.filter((xport) =>
     (BROWSER_EXPORTS as unknown as string[]).includes(xport)
   );
+  const reactComponentExports = browserExports.filter((xport) =>
+    ["CatchBoundary", "ErrorBoundary", "default"].includes(xport)
+  );
+  const otherExports = browserExports.filter(
+    (xport) => !["CatchBoundary", "ErrorBoundary", "default"].includes(xport)
+  );
 
-  let virtualModule = "module.exports = {};";
-  if (browserExports.length !== 0) {
-    virtualModule = `export { ${browserExports.join(
-      ", "
-    )} } from "${routePath}";`;
+  // tree-shake & lazy imports
+  const results = (
+    await Promise.all(
+      browserExports.map(async (xport) => {
+        return [
+          xport,
+          await build(
+            `export { ${xport} } from "${routePath}";`,
+            routePath,
+            remixConfig
+          ),
+        ];
+      })
+    )
+  ).reduce<Record<string, string>>((acc, [xport, content]) => {
+    acc[xport] = content;
+    return acc;
+  }, {});
+
+  let virtual = "";
+
+  if (reactComponentExports.length !== 0) {
+    virtual += `import { lazy } from "react";\n`;
+
+    for (const C of reactComponentExports) {
+      virtual +=
+        C === "default"
+          ? `export default lazy(() => import("${C}").then((mod) => ({ default: mod.default })));`
+          : `export const ${C} = lazy(() => import("${C}").then((mod) => ({ default: mod.${C} })));`;
+      virtual += "\n";
+    }
   }
+  if (otherExports.length !== 0) {
+    for (const xport of otherExports) {
+      virtual += `export { ${xport} } from "${xport}";\n`;
+    }
+  }
+  virtual ||= "module.exports = {};";
 
   const { outputFiles } = await esbuild.build({
-    stdin: { contents: virtualModule, resolveDir: remixConfig.rootDirectory },
+    stdin: { contents: virtual, resolveDir: remixConfig.rootDirectory },
+    format: "esm",
+    target: "es2018",
+    treeShaking: true,
+    write: false,
+    // sourcemap: "inline",
+    bundle: true,
+    plugins: [
+      {
+        name: "virtuals",
+        setup(build) {
+          build.onResolve({ filter: /.*/ }, (args) => {
+            if (results[args.path]) {
+              return { path: args.path, namespace: "virtuals" };
+            }
+            if (args.path === routePath) return undefined;
+            return { external: true, sideEffects: false };
+          });
+          build.onLoad({ filter: /.*/, namespace: "virtuals" }, (args) => {
+            return {
+              contents: results[args.path],
+              resolveDir: remixConfig.rootDirectory,
+            };
+          });
+        },
+      },
+    ],
+  });
+  const result = outputFiles[0].text;
+  return result;
+}
+
+async function build(
+  contents: string,
+  routePath: string,
+  remixConfig: RemixConfig
+) {
+  const { outputFiles } = await esbuild.build({
+    stdin: { contents, resolveDir: remixConfig.rootDirectory },
     format: "esm",
     target: "es2018",
     treeShaking: true,
@@ -50,7 +126,8 @@ async function treeshakeBrowserExports(
       },
     ],
   });
-  return outputFiles[0].text;
+  const result = outputFiles[0].text;
+  return result;
 }
 
 export default async function BrowserRoutesLoader(

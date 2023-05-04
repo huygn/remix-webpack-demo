@@ -74,7 +74,7 @@ async function treeshakeBrowserExports(
     target: "es2018",
     treeShaking: true,
     write: false,
-    // sourcemap: "inline",
+    sourcemap: "inline",
     bundle: true,
     plugins: [
       {

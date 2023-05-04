@@ -63,6 +63,15 @@ export async function serve(
     purgeAppRequireCache(config.serverBuildPath);
     next();
   });
+  app.use((_, res, next) => {
+    if (mode === "development") {
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "*");
+      res.setHeader("Access-Control-Allow-Headers", "*");
+    }
+    next();
+  });
   app.use(
     createApp(
       config.serverBuildPath,

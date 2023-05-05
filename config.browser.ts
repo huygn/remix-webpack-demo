@@ -29,6 +29,13 @@ export const createBrowserConfig = (
   remixConfig: RemixConfig
 ): webpack.Configuration => {
   const browserRoutes = getBrowserRoutes(remixConfig);
+  const entryExtras = {
+    library: { type: "module" },
+    chunkLoading: "import",
+    runtime: "runtime",
+    asyncChunks: true,
+  };
+
   return {
     mode,
     devtool: mode === "development" ? "inline-cheap-source-map" : undefined,
@@ -41,11 +48,22 @@ export const createBrowserConfig = (
       extensions: [".tsx", ".ts", ".jsx", ".js"],
     },
     entry: {
-      "entry.client": path.resolve(
-        remixConfig.appDirectory,
-        remixConfig.entryClientFile
+      "entry.client": {
+        import: path.resolve(
+          remixConfig.appDirectory,
+          remixConfig.entryClientFile
+        ),
+        ...entryExtras,
+      },
+      ...obj.fromEntries(
+        browserRoutes.map(([id, routePath]) => [
+          id,
+          {
+            import: routePath,
+            ...entryExtras,
+          },
+        ])
       ),
-      ...obj.fromEntries(browserRoutes),
     },
     module: {
       rules: [
@@ -101,13 +119,15 @@ export const createBrowserConfig = (
         },
       ],
     },
+    experiments: {
+      outputModule: true,
+    },
     output: {
       path: remixConfig.assetsBuildDirectory,
       publicPath: remixConfig.publicPath,
+      // publicPath: "auto",
       module: true,
-      library: { type: "module" },
       chunkFormat: "module",
-      chunkLoading: "import",
       assetModuleFilename: "_assets/[name]-[contenthash][ext]",
       cssChunkFilename: "_assets/[name]-[contenthash][ext]",
       filename: "[name]-[contenthash].js",
@@ -115,21 +135,13 @@ export const createBrowserConfig = (
     },
     optimization: {
       moduleIds: "deterministic",
-      runtimeChunk: "single",
-
+      runtimeChunk: false,
+      minimize: mode === "production",
+      minimizer: [new ESBuildMinifyPlugin({ target: "es2019" })],
       // treeshake unused code in development
       // needed so that browser build does not pull in server code
       usedExports: true,
       innerGraph: true,
-      splitChunks: {
-        chunks: "async", // not all, async as workaround
-      },
-      minimize: mode === "production",
-      minimizer: [new ESBuildMinifyPlugin({ target: "es2019" })],
-    },
-    externalsType: "module",
-    experiments: {
-      outputModule: true,
     },
     plugins: [
       new VirtualModulesPlugin(

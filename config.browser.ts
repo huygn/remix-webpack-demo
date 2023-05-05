@@ -25,6 +25,11 @@ const getBrowserRoutes = (remixConfig: RemixConfig): [string, string][] =>
 const mode =
   process.env.NODE_ENV === "development" ? "development" : "production";
 
+const mfShared = {
+  react: { singleton: true, eager: true, version: "0" },
+  "react-dom": { singleton: true, eager: true, version: "0" },
+};
+
 export const createBrowserConfig = (
   remixConfig: RemixConfig
 ): webpack.Configuration => {
@@ -33,8 +38,8 @@ export const createBrowserConfig = (
     library: { type: "module" },
     chunkLoading: "import",
     runtime: "runtime",
-    asyncChunks: true,
-  };
+    // asyncChunks: true,
+  } as const;
 
   return {
     mode,
@@ -69,12 +74,26 @@ export const createBrowserConfig = (
       rules: [
         {
           test: /\.[j|t]sx?$/,
-          loader: "esbuild-loader",
           exclude: /node_modules/,
-          options: {
-            target: "es2019",
-            loader: "tsx",
-          },
+          use: [
+            {
+              loader: "esbuild-loader",
+              options: {
+                target: "es2019",
+                loader: "tsx",
+              },
+            },
+            {
+              loader: require.resolve(
+                "./scripts/compiler-webpack/loaders/share-scope-hoist-loader.ts"
+              ),
+              options: {
+                shared: {
+                  ...mfShared,
+                },
+              },
+            },
+          ],
         },
 
         {
@@ -144,6 +163,19 @@ export const createBrowserConfig = (
       innerGraph: true,
     },
     plugins: [
+      new webpack.container.ModuleFederationPlugin({
+        name: "webapp",
+        library: { type: "var", name: "webapp" },
+        remoteType: "var",
+        filename: "remoteEntry.js",
+        exposes: {
+          "./button": "./app/components/button",
+        },
+        shared: {
+          ...mfShared,
+        },
+      }),
+
       new VirtualModulesPlugin(
         obj.fromEntries(browserRoutes.map(([, route]) => [route, ""] as const))
       ),

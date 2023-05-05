@@ -4,7 +4,6 @@ import {
   Link,
   Links,
   LiveReload,
-  NavLink,
   Outlet,
   Scripts,
   useLoaderData,
@@ -15,6 +14,7 @@ import { Suspense, useEffect } from "react";
 
 import ErrorPage from "~/lib/error-page";
 import styles from "~/index.css";
+import { Button } from "./components/button";
 
 export function links() {
   return [{ rel: "stylesheet", href: styles }];
@@ -31,7 +31,7 @@ export async function action() {
 }
 
 export default function Root() {
-  const { contacts, q } = useLoaderData<typeof loader>();
+  const { q } = useLoaderData<typeof loader>();
   const navigation = useNavigation();
   const submit = useSubmit();
 
@@ -86,47 +86,17 @@ export default function Root() {
               </Form>
             </div>
             <nav>
-              {contacts.length ? (
-                <ul>
-                  {contacts.map((contact) => (
-                    <li key={contact.id}>
-                      <NavLink
-                        to={`contacts/${contact.id}`}
-                        className={({ isActive }) =>
-                          isActive
-                            ? "active"
-                            : // `isPending` isn't in Remix yet, otherwise this would be easier
-                            navigation.state === "loading" &&
-                              navigation.location.pathname.endsWith(
-                                "/" + contact.id
-                              )
-                            ? "pending"
-                            : ""
-                        }
-                      >
-                        {contact.first || contact.last ? (
-                          <>
-                            {contact.first} {contact.last}
-                          </>
-                        ) : (
-                          <i>No Name</i>
-                        )}{" "}
-                        {contact.favorite && <span>★</span>}
-                      </NavLink>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p>
-                  <i>No contacts</i>
-                </p>
-              )}
+              <p>
+                <i>No contacts</i>
+              </p>
             </nav>
           </div>
           <div
             id="detail"
             className={navigation.state === "loading" ? "loading" : ""}
           >
+            <Button />
+
             <Suspense>
               <Outlet />
             </Suspense>

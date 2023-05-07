@@ -7,7 +7,7 @@ import webpack from "webpack";
 import VirtualModulesPlugin from "webpack-virtual-modules";
 
 import * as obj from "./scripts/utils/object";
-import { TriggerShareScopePlugin } from "./scripts/compiler-webpack/trigger-share-scope-plugin";
+import { AssignShareScopePlugin } from "./scripts/compiler-webpack/assign-share-scope-plugin";
 
 const BROWSER_ROUTE_PREFIX = "__remix_browser_route__";
 const BROWSER_ROUTE_REGEX = new RegExp("/" + BROWSER_ROUTE_PREFIX);
@@ -27,8 +27,8 @@ const mode =
   process.env.NODE_ENV === "development" ? "development" : "production";
 
 const mfShared = {
-  react: { singleton: true, eager: true, version: "0" },
-  "react-dom": { singleton: true, eager: true, version: "0" },
+  react: { singleton: true, eager: true },
+  "react-dom": { singleton: true, eager: true },
 };
 
 export const createBrowserConfig = (
@@ -166,7 +166,7 @@ export const createBrowserConfig = (
           ...mfShared,
         },
       }),
-      new TriggerShareScopePlugin(),
+      new AssignShareScopePlugin(),
 
       new VirtualModulesPlugin(
         obj.fromEntries(browserRoutes.map(([, route]) => [route, ""] as const))
@@ -177,7 +177,7 @@ export const createBrowserConfig = (
       }),
 
       // shim react so it can be used without importing
-      new webpack.ProvidePlugin({ React: ["react"] }),
+      // new webpack.ProvidePlugin({ React: ["react"] }),
     ],
   };
 };

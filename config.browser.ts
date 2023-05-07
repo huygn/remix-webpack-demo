@@ -175,9 +175,6 @@ export const createBrowserConfig = (
       new webpack.EnvironmentPlugin({
         REMIX_DEV_SERVER_WS_PORT: JSON.stringify(remixConfig.devServerPort),
       }),
-
-      // shim react so it can be used without importing
-      // new webpack.ProvidePlugin({ React: ["react"] }),
     ],
   };
 };

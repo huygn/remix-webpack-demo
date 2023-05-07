@@ -1,8 +1,10 @@
 import fs from "fs";
 import path from "path";
 
-import { AssetsManifest } from "@remix-run/dev/dist/compiler/assets";
-import { RemixConfig } from "@remix-run/dev/dist/config";
+import type {
+  AssetsManifest,
+  ResolvedRemixConfig as RemixConfig,
+} from "@remix-run/dev";
 
 import { createChannel } from "../utils/channel";
 import type { RemixCompiler } from "./interface";

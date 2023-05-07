@@ -1,7 +1,9 @@
 import path from "path";
 
-import type { AssetsManifest } from "@remix-run/dev/dist/compiler/assets";
-import type { RemixConfig } from "@remix-run/dev/dist/config";
+import type {
+  AssetsManifest,
+  ResolvedRemixConfig as RemixConfig,
+} from "@remix-run/dev";
 import webpack from "webpack";
 import VirtualModulesPlugin from "webpack-virtual-modules";
 

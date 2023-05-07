@@ -7,6 +7,7 @@ import webpack from "webpack";
 import VirtualModulesPlugin from "webpack-virtual-modules";
 
 import * as obj from "./scripts/utils/object";
+import { TriggerShareScopePlugin } from "./scripts/compiler-webpack/trigger-share-scope-plugin";
 
 const BROWSER_ROUTE_PREFIX = "__remix_browser_route__";
 const BROWSER_ROUTE_REGEX = new RegExp("/" + BROWSER_ROUTE_PREFIX);
@@ -38,7 +39,6 @@ export const createBrowserConfig = (
     library: { type: "module" },
     chunkLoading: "import",
     runtime: "runtime",
-    // asyncChunks: true,
   } as const;
 
   return {
@@ -81,16 +81,6 @@ export const createBrowserConfig = (
               options: {
                 target: "es2019",
                 loader: "tsx",
-              },
-            },
-            {
-              loader: require.resolve(
-                "./scripts/compiler-webpack/loaders/share-scope-hoist-loader.ts"
-              ),
-              options: {
-                shared: {
-                  ...mfShared,
-                },
               },
             },
           ],
@@ -162,6 +152,7 @@ export const createBrowserConfig = (
       usedExports: true,
       innerGraph: true,
     },
+    cache: false,
     plugins: [
       new webpack.container.ModuleFederationPlugin({
         name: "webapp",
@@ -175,6 +166,7 @@ export const createBrowserConfig = (
           ...mfShared,
         },
       }),
+      new TriggerShareScopePlugin(),
 
       new VirtualModulesPlugin(
         obj.fromEntries(browserRoutes.map(([, route]) => [route, ""] as const))

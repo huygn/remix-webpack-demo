@@ -26,19 +26,12 @@ const getBrowserRoutes = (remixConfig: RemixConfig): [string, string][] =>
 const mode =
   process.env.NODE_ENV === "development" ? "development" : "production";
 
-const mfShared = {
-  react: { singleton: true, eager: true },
-  "react-dom": { singleton: true, eager: true },
-};
-
 export const createBrowserConfig = (
   remixConfig: RemixConfig
 ): webpack.Configuration => {
   const browserRoutes = getBrowserRoutes(remixConfig);
   const entryExtras = {
-    library: { type: "module" },
-    chunkLoading: "import",
-    runtime: "runtime",
+    runtime: "runtime", // single runtime chunk for all entries (routes)
   } as const;
 
   return {
@@ -82,6 +75,11 @@ export const createBrowserConfig = (
                 target: "es2019",
                 loader: "tsx",
               },
+            },
+            {
+              loader: require.resolve(
+                "./scripts/compiler-webpack/loaders/share-scope-inject-loader.ts"
+              ),
             },
           ],
         },
@@ -131,20 +129,27 @@ export const createBrowserConfig = (
     experiments: {
       outputModule: true,
     },
+    externalsType: "module",
     output: {
       path: remixConfig.assetsBuildDirectory,
       publicPath: remixConfig.publicPath,
       // publicPath: "auto",
       module: true,
+      library: { type: "module" },
       chunkFormat: "module",
+      chunkLoading: "import",
       assetModuleFilename: "_assets/[name]-[contenthash][ext]",
       cssChunkFilename: "_assets/[name]-[contenthash][ext]",
       filename: "[name]-[contenthash].js",
       chunkFilename: "[name]-[contenthash].js",
+      ignoreBrowserWarnings: mode === "production",
     },
     optimization: {
       moduleIds: "deterministic",
       runtimeChunk: false,
+      splitChunks: {
+        chunks: "async",
+      },
       minimize: mode === "production",
       minimizer: [new ESBuildMinifyPlugin({ target: "es2019" })],
       // treeshake unused code in development
@@ -152,18 +157,24 @@ export const createBrowserConfig = (
       usedExports: true,
       innerGraph: true,
     },
-    cache: false,
+    cache: {
+      type: "filesystem",
+      name: `web-scripts-remix-browser-${mode}`,
+      buildDependencies: {
+        config: [__filename],
+      },
+    },
     plugins: [
       new webpack.container.ModuleFederationPlugin({
         name: "webapp",
-        library: { type: "var", name: "webapp" },
-        remoteType: "var",
+        library: { type: "module" },
         filename: "remoteEntry.js",
         exposes: {
           "./button": "./app/components/button",
         },
         shared: {
-          ...mfShared,
+          react: { singleton: true, eager: true },
+          "react-dom": { singleton: true, eager: true },
         },
       }),
       new AssignShareScopePlugin(),

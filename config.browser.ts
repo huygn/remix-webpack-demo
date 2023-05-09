@@ -7,6 +7,7 @@ import webpack from "webpack";
 import VirtualModulesPlugin from "webpack-virtual-modules";
 
 import * as obj from "./scripts/utils/object";
+import { AssignShareScopePlugin } from "./scripts/compiler-webpack/assign-share-scope-plugin";
 
 const BROWSER_ROUTE_PREFIX = "__remix_browser_route__";
 const BROWSER_ROUTE_REGEX = new RegExp("/" + BROWSER_ROUTE_PREFIX);
@@ -29,6 +30,10 @@ export const createBrowserConfig = (
   remixConfig: RemixConfig
 ): webpack.Configuration => {
   const browserRoutes = getBrowserRoutes(remixConfig);
+  const entryExtras = {
+    runtime: "runtime", // single runtime chunk for all entries (routes)
+  } as const;
+
   return {
     mode,
     devtool: mode === "development" ? "inline-cheap-source-map" : undefined,
@@ -41,22 +46,42 @@ export const createBrowserConfig = (
       extensions: [".tsx", ".ts", ".jsx", ".js"],
     },
     entry: {
-      "entry.client": path.resolve(
-        remixConfig.appDirectory,
-        remixConfig.entryClientFile
+      "entry.client": {
+        import: path.resolve(
+          remixConfig.appDirectory,
+          remixConfig.entryClientFile
+        ),
+        ...entryExtras,
+      },
+      ...obj.fromEntries(
+        browserRoutes.map(([id, routePath]) => [
+          id,
+          {
+            import: routePath,
+            ...entryExtras,
+          },
+        ])
       ),
-      ...obj.fromEntries(browserRoutes),
     },
     module: {
       rules: [
         {
           test: /\.[j|t]sx?$/,
-          loader: "esbuild-loader",
           exclude: /node_modules/,
-          options: {
-            target: "es2019",
-            loader: "tsx",
-          },
+          use: [
+            {
+              loader: "esbuild-loader",
+              options: {
+                target: "es2019",
+                loader: "tsx",
+              },
+            },
+            {
+              loader: require.resolve(
+                "./scripts/compiler-webpack/loaders/share-scope-inject-loader.ts"
+              ),
+            },
+          ],
         },
 
         {
@@ -101,9 +126,14 @@ export const createBrowserConfig = (
         },
       ],
     },
+    experiments: {
+      outputModule: true,
+    },
+    externalsType: "module",
     output: {
       path: remixConfig.assetsBuildDirectory,
       publicPath: remixConfig.publicPath,
+      // publicPath: "auto",
       module: true,
       library: { type: "module" },
       chunkFormat: "module",
@@ -112,26 +142,43 @@ export const createBrowserConfig = (
       cssChunkFilename: "_assets/[name]-[contenthash][ext]",
       filename: "[name]-[contenthash].js",
       chunkFilename: "[name]-[contenthash].js",
+      ignoreBrowserWarnings: mode === "production",
     },
     optimization: {
       moduleIds: "deterministic",
-      runtimeChunk: "single",
-
+      runtimeChunk: false,
+      splitChunks: {
+        chunks: "async",
+      },
+      minimize: mode === "production",
+      minimizer: [new ESBuildMinifyPlugin({ target: "es2019" })],
       // treeshake unused code in development
       // needed so that browser build does not pull in server code
       usedExports: true,
       innerGraph: true,
-      splitChunks: {
-        chunks: "async", // not all, async as workaround
-      },
-      minimize: mode === "production",
-      minimizer: [new ESBuildMinifyPlugin({ target: "es2019" })],
     },
-    externalsType: "module",
-    experiments: {
-      outputModule: true,
+    cache: {
+      type: "filesystem",
+      name: `web-scripts-remix-browser-${mode}`,
+      buildDependencies: {
+        config: [__filename],
+      },
     },
     plugins: [
+      new webpack.container.ModuleFederationPlugin({
+        name: "webapp",
+        library: { type: "module" },
+        filename: "remoteEntry.js",
+        exposes: {
+          "./button": "./app/components/button",
+        },
+        shared: {
+          react: { singleton: true, eager: true },
+          "react-dom": { singleton: true, eager: true },
+        },
+      }),
+      new AssignShareScopePlugin(),
+
       new VirtualModulesPlugin(
         obj.fromEntries(browserRoutes.map(([, route]) => [route, ""] as const))
       ),
@@ -139,9 +186,6 @@ export const createBrowserConfig = (
       new webpack.EnvironmentPlugin({
         REMIX_DEV_SERVER_WS_PORT: JSON.stringify(remixConfig.devServerPort),
       }),
-
-      // shim react so it can be used without importing
-      new webpack.ProvidePlugin({ React: ["react"] }),
     ],
   };
 };

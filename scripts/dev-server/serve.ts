@@ -63,6 +63,17 @@ export async function serve(
     purgeAppRequireCache(config.serverBuildPath);
     next();
   });
+  app.use((req, res, next) => {
+    if (mode === "development") {
+      if (req.url.endsWith(".js")) {
+        res.setHeader("Cache-Control", "public,max-age=0,must-revalidate");
+      }
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "*");
+      res.setHeader("Access-Control-Allow-Headers", "*");
+    }
+    next();
+  });
   app.use(
     createApp(
       config.serverBuildPath,
